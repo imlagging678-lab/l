@@ -1,11 +1,10 @@
 -- ==========================================
--- DIVERGENT FIST (AUTO LOCK-ON + STEALTH FLING)
+-- DIVERGENT FIST (JJS LOCK-ON + ULTRA FLING)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
 
 local tool = Instance.new("Tool")
@@ -16,14 +15,21 @@ tool.Parent = player:WaitForChild("Backpack")
 local isEquipped, canAttack = false, true
 local lockedTarget = nil
 
--- [EN YAKIN RAKİBİ BULMA (LOCK-ON)]
-local function getClosestPlayer()
-    local closest, dist = nil, 25 -- Kilitlenme mesafesi (25 stud)
+-- [GÖRSEL İŞARETÇİ]
+local lockHighlight = Instance.new("Highlight")
+lockHighlight.FillColor = Color3.fromRGB(255, 0, 0)
+lockHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+lockHighlight.FillTransparency = 0.5
+
+-- [AGRESİF LOCK-ON FONKSİYONU]
+local function findTarget()
+    local closest, dist = nil, 100 -- Mesafeyi 100 stud'a çıkardım (Bayağı uzak)
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local d = (player.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            local hrp = p.Character.HumanoidRootPart
+            local d = (player.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
             if d < dist then
-                closest = p.Character.HumanoidRootPart
+                closest = hrp
                 dist = d
             end
         end
@@ -31,16 +37,22 @@ local function getClosestPlayer()
     return closest
 end
 
--- [ANA MOTOR: JJS LOCK-ON & FLING]
+-- [ANA MOTOR]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
         
-        -- 1. LOCK-ON MANTIĞI
-        lockedTarget = getClosestPlayer()
-        
-        -- 2. HIZ & HAREKET
+        -- 1. HEDEFİ BUL VE İŞARETLE
+        lockedTarget = findTarget()
+        if lockedTarget then
+            lockHighlight.Adornee = lockedTarget.Parent
+            lockHighlight.Parent = lockedTarget.Parent
+        else
+            lockHighlight.Parent = nil
+        end
+
+        -- 2. HAREKET (2.5x Speed)
         if hum and hum.MoveDirection.Magnitude > 0 then
             HRP.AssemblyLinearVelocity = Vector3.new(
                 hum.MoveDirection.X * 42,
@@ -49,25 +61,26 @@ RunService.Heartbeat:Connect(function()
             )
         end
 
-        -- 3. FLING GÜCÜ (1M TORK)
+        -- 3. FLING GÜCÜ (Sarsıntısız)
         HRP.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
 
-        -- 4. CFrame SABİTLEME & KİLİTLENME
+        -- 4. JJS STİLİ KİLİTLENME
         if lockedTarget then
-            -- Düşmana kilitlenmişse ona bak
+            -- Karakteri rakibe döndür
             local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
             HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
             
-            -- Kamerayı da hafifçe rakibe odakla (JJS Tarzı)
-            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, lockedTarget.Position), 0.1)
+            -- Kamerayı yumuşakça rakibe odakla
+            local camLook = CFrame.lookAt(camera.CFrame.Position, lockedTarget.Position)
+            camera.CFrame = camera.CFrame:Lerp(camLook, 0.15) -- 0.15 kilitlenme hızı
         else
-            -- Kimse yoksa kameranın baktığı yöne bak
+            -- Kimse yoksa normal bakış
             local camCF = camera.CFrame
             local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
             HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + flatLook)
         end
 
-        -- Sarsıntı Engelleme
+        -- Görsel dönmeyi engelle (Client/Server)
         RunService.RenderStepped:Wait()
         HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
@@ -75,33 +88,29 @@ end)
 
 -- [VURUŞ MANTIĞI]
 tool.Activated:Connect(function()
-    if not canAttack or not player.Character then return end
+    if not canAttack or not player.Character or not lockedTarget then return end
     local HRP = player.Character.HumanoidRootPart
     
-    -- Eğer kilitli hedef varsa ona saldır, yoksa mouse hedefi
-    local targetHRP = lockedTarget or (mouse.Target and mouse.Target.Parent and mouse.Target.Parent:FindFirstChild("HumanoidRootPart"))
-    
-    if targetHRP and (HRP.Position - targetHRP.Position).Magnitude < 12 then
+    if (HRP.Position - lockedTarget.Position).Magnitude < 15 then
         canAttack = false
-        targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
-        task.wait(0.1)
+        lockedTarget.AssemblyLinearVelocity = Vector3.new(0,0,0)
         
+        -- Işınlanıp vurma
         local oldCF = HRP.CFrame
-        HRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 0.5)
-        HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 25000) + Vector3.new(0, 10000, 0)
+        HRP.CFrame = lockedTarget.CFrame * CFrame.new(0, 0, 1)
+        HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 30000) + Vector3.new(0, 15000, 0)
         
-        task.wait(0.05)
+        task.wait(0.06)
         HRP.CFrame = oldCF
         task.wait(0.5)
         canAttack = true
     end
 end)
 
--- [EQUIP AYARLARI]
+-- [EQUIP]
 tool.Equipped:Connect(function() 
     isEquipped = true 
     player.Character.Humanoid.AutoRotate = false
-    -- Kütle manipülasyonu
     for _, v in pairs(player.Character:GetChildren()) do
         if v:IsA("BasePart") then v.Massless = true end
     end
@@ -109,8 +118,8 @@ end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
+    lockHighlight.Parent = nil
     player.Character.Humanoid.AutoRotate = true
-    lockedTarget = nil
     for _, v in pairs(player.Character:GetChildren()) do
         if v:IsA("BasePart") then v.Massless = false end
     end
