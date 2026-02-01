@@ -1,11 +1,12 @@
 -- ==========================================
--- DIVERGENT FIST (MASSIVE INERTIA FLING)
+-- DIVERGENT FIST (AUTO LOCK-ON + STEALTH FLING)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
+local camera = workspace.CurrentCamera
 
 local tool = Instance.new("Tool")
 tool.Name = "Divergent Fist"
@@ -13,22 +14,33 @@ tool.RequiresHandle = false
 tool.Parent = player:WaitForChild("Backpack")
 
 local isEquipped, canAttack = false, true
+local lockedTarget = nil
 
--- [ANA MOTOR: MASSIVE WEIGHT & STEALTH FLING]
+-- [EN YAKIN RAKİBİ BULMA (LOCK-ON)]
+local function getClosestPlayer()
+    local closest, dist = nil, 25 -- Kilitlenme mesafesi (25 stud)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (player.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                closest = p.Character.HumanoidRootPart
+                dist = d
+            end
+        end
+    end
+    return closest
+end
+
+-- [ANA MOTOR: JJS LOCK-ON & FLING]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
         
-        -- 1. 1M AĞIRLIK VE FİZİKSEL DİRENÇ SİMÜLASYONU
-        -- Karakterin parçalarını kütlesiz yapıp hız vektörünü biz yönetiyoruz
-        for _, v in pairs(player.Character:GetChildren()) do
-            if v:IsA("BasePart") then
-                v.Massless = true -- Kendi ağırlığını yok et ki hızımız engellenmesin
-            end
-        end
-
-        -- 2. HIZ MOTORU (Senin Orijinal Hızın)
+        -- 1. LOCK-ON MANTIĞI
+        lockedTarget = getClosestPlayer()
+        
+        -- 2. HIZ & HAREKET
         if hum and hum.MoveDirection.Magnitude > 0 then
             HRP.AssemblyLinearVelocity = Vector3.new(
                 hum.MoveDirection.X * 42,
@@ -36,70 +48,70 @@ RunService.Heartbeat:Connect(function()
                 hum.MoveDirection.Z * 42
             )
         end
-        
-        -- 3. CFrame ÜZERİNDEN 1M TORK (DÖNME GİZLEME)
-        -- Fizik motoruna "bu parça 1 milyon birim dönüyor" diyoruz (AngularVelocity)
-        -- Ama CFrame'i her karede dondurarak görseli sabitliyoruz.
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 99999, 0) -- Aşırı tork
-        
-        -- Burası büyü: Fiziksel hızı koru ama görseli anında kilitle
-        local camCF = workspace.CurrentCamera.CFrame
-        local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
-        
-        -- CFrame ile karakteri 1M ağırlık varmış gibi sarsılmaz yapıyoruz
-        HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + flatLook)
-        
-        -- [CLIENT FIX]: Kendi ekranında titremeyi %0'a indirmek için
+
+        -- 3. FLING GÜCÜ (1M TORK)
+        HRP.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+
+        -- 4. CFrame SABİTLEME & KİLİTLENME
+        if lockedTarget then
+            -- Düşmana kilitlenmişse ona bak
+            local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
+            HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
+            
+            -- Kamerayı da hafifçe rakibe odakla (JJS Tarzı)
+            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, lockedTarget.Position), 0.1)
+        else
+            -- Kimse yoksa kameranın baktığı yöne bak
+            local camCF = camera.CFrame
+            local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
+            HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + flatLook)
+        end
+
+        -- Sarsıntı Engelleme
         RunService.RenderStepped:Wait()
         HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
 end)
 
--- [VURUŞ MANTIĞI - SENİN ORİJİNAL KODUN]
+-- [VURUŞ MANTIĞI]
 tool.Activated:Connect(function()
     if not canAttack or not player.Character then return end
     local HRP = player.Character.HumanoidRootPart
-    local target = mouse.Target
     
-    if target and target.Parent and target.Parent:FindFirstChild("HumanoidRootPart") then
-        local enemyHRP = target.Parent.HumanoidRootPart
-        if (HRP.Position - enemyHRP.Position).Magnitude < 10 then
-            canAttack = false
-            enemyHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
-            task.wait(0.12)
-            
-            local oldCF = HRP.CFrame
-            local power = (UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter) and 12000 or 22000
-            
-            HRP.CFrame = enemyHRP.CFrame * CFrame.new(0, 0, 0.4)
-            HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * power) + Vector3.new(0, 8000, 0)
-            
-            task.wait(0.05)
-            HRP.CFrame = oldCF
-            HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            
-            task.wait(0.6)
-            canAttack = true
-        end
+    -- Eğer kilitli hedef varsa ona saldır, yoksa mouse hedefi
+    local targetHRP = lockedTarget or (mouse.Target and mouse.Target.Parent and mouse.Target.Parent:FindFirstChild("HumanoidRootPart"))
+    
+    if targetHRP and (HRP.Position - targetHRP.Position).Magnitude < 12 then
+        canAttack = false
+        targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        task.wait(0.1)
+        
+        local oldCF = HRP.CFrame
+        HRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 0.5)
+        HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 25000) + Vector3.new(0, 10000, 0)
+        
+        task.wait(0.05)
+        HRP.CFrame = oldCF
+        task.wait(0.5)
+        canAttack = true
     end
 end)
 
--- [EQUIP/UNEQUIP]
+-- [EQUIP AYARLARI]
 tool.Equipped:Connect(function() 
     isEquipped = true 
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 40
-        player.Character.Humanoid.AutoRotate = false -- Kendi CFrame kontrolümüz için kapalı
+    player.Character.Humanoid.AutoRotate = false
+    -- Kütle manipülasyonu
+    for _, v in pairs(player.Character:GetChildren()) do
+        if v:IsA("BasePart") then v.Massless = true end
     end
 end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 16
-        player.Character.Humanoid.AutoRotate = true
-        for _, v in pairs(player.Character:GetChildren()) do
-            if v:IsA("BasePart") then v.Massless = false end
-        end
+    player.Character.Humanoid.AutoRotate = true
+    lockedTarget = nil
+    for _, v in pairs(player.Character:GetChildren()) do
+        if v:IsA("BasePart") then v.Massless = false end
     end
 end)
