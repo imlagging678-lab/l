@@ -1,9 +1,8 @@
 -- ==========================================
--- DIVERGENT FIST (PROXIMITY FLING + LOCK-ON)
+-- DIVERGENT FIST (BALANCED HITBOX FLING)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
@@ -15,9 +14,9 @@ tool.Parent = player:WaitForChild("Backpack")
 local isEquipped, canAttack = false, true
 local lockedTarget = nil
 
--- [AGRESİF LOCK-ON]
+-- [MESAFE KONTROLÜ VE HEDEF BULMA]
 local function findTarget()
-    local closest, dist = nil, 60 -- Kilitlenme menzili
+    local closest, dist = nil, 60 
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = p.Character.HumanoidRootPart
@@ -31,7 +30,7 @@ local function findTarget()
     return closest
 end
 
--- [ANA MOTOR: SADECE TEMASTA SPIN]
+-- [ANA MOTOR: GÜCÜ DÜŞÜRÜLMÜŞ GİZLİ SPIN]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
@@ -48,22 +47,23 @@ RunService.Heartbeat:Connect(function()
             )
         end
 
-        -- 2. AKILLI GİZLİ SPIN (SADECE DİBİNDEYSE)
+        -- 2. GİZLİ SPİN MANTIĞI (GÜÇ 2 SEVİYESİNDE)
         if lockedTarget then
             local distance = (HRP.Position - lockedTarget.Position).Magnitude
             
-            if distance < 5 then -- DÜŞMANIN DİBİNE GİRİNCE (Hitbox Teması)
-                -- Fiziksel olarak aşırı hızlı dön (Uçurmak için)
-                HRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
+            -- HITBOX İÇİNDEYSE
+            if distance <= 5.5 then 
+                -- Fling gücü düşürüldü (Daha stabil ama etkili)
+                HRP.AssemblyAngularVelocity = Vector3.new(0, 5000, 0) -- Eskiden 99999 idi, şimdi daha dengeli
                 
-                -- Ama görüntüyü CFrame ile anında kilitle (Gizlilik için)
+                -- Görüntü Sabitleme
                 local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
                 HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
             else
-                -- Düşman uzaktaysa spini tamamen kapat
+                -- UZAKTAYSA SIFIR SPIN
                 HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                 
-                -- Sadece kilitlen ve ona bak
+                -- Sadece kilitlen
                 local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
                 HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
             end
@@ -72,22 +72,21 @@ RunService.Heartbeat:Connect(function()
             local camLook = CFrame.lookAt(camera.CFrame.Position, lockedTarget.Position)
             camera.CFrame = camera.CFrame:Lerp(camLook, 0.12)
         else
-            -- Kimse yoksa spini kapat ve normal bak
             HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             local camCF = camera.CFrame
             local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
             HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + flatLook)
         end
 
-        -- Render kilit (Görsel pürüzsüzlük)
+        -- Görsel pürüzsüzlük için Render sıfırlama
         RunService.RenderStepped:Wait()
-        if not lockedTarget or (HRP.Position - lockedTarget.Position).Magnitude >= 5 then
+        if not lockedTarget or (HRP.Position - lockedTarget.Position).Magnitude > 5.5 then
             HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
     end
 end)
 
--- [VURUŞ MANTIĞI]
+-- [VURUŞ MANTIĞI AYNI KALDI]
 tool.Activated:Connect(function()
     if not canAttack or not player.Character or not lockedTarget then return end
     local HRP = player.Character.HumanoidRootPart
@@ -107,19 +106,13 @@ tool.Activated:Connect(function()
     end
 end)
 
--- [EQUIP]
+-- [EQUIP AYARLARI]
 tool.Equipped:Connect(function() 
     isEquipped = true 
     player.Character.Humanoid.AutoRotate = false
-    for _, v in pairs(player.Character:GetChildren()) do
-        if v:IsA("BasePart") then v.Massless = true end
-    end
 end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
     player.Character.Humanoid.AutoRotate = true
-    for _, v in pairs(player.Character:GetChildren()) do
-        if v:IsA("BasePart") then v.Massless = false end
-    end
 end)
