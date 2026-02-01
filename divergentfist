@@ -1,5 +1,5 @@
 -- ==========================================
--- DIVERGENT FIST (JJS LOCK-ON + ULTRA FLING)
+-- DIVERGENT FIST (PROXIMITY FLING + LOCK-ON)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,15 +15,9 @@ tool.Parent = player:WaitForChild("Backpack")
 local isEquipped, canAttack = false, true
 local lockedTarget = nil
 
--- [GÖRSEL İŞARETÇİ]
-local lockHighlight = Instance.new("Highlight")
-lockHighlight.FillColor = Color3.fromRGB(255, 0, 0)
-lockHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-lockHighlight.FillTransparency = 0.5
-
--- [AGRESİF LOCK-ON FONKSİYONU]
+-- [AGRESİF LOCK-ON]
 local function findTarget()
-    local closest, dist = nil, 100 -- Mesafeyi 100 stud'a çıkardım (Bayağı uzak)
+    local closest, dist = nil, 60 -- Kilitlenme menzili
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = p.Character.HumanoidRootPart
@@ -37,22 +31,15 @@ local function findTarget()
     return closest
 end
 
--- [ANA MOTOR]
+-- [ANA MOTOR: SADECE TEMASTA SPIN]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
         
-        -- 1. HEDEFİ BUL VE İŞARETLE
         lockedTarget = findTarget()
-        if lockedTarget then
-            lockHighlight.Adornee = lockedTarget.Parent
-            lockHighlight.Parent = lockedTarget.Parent
-        else
-            lockHighlight.Parent = nil
-        end
 
-        -- 2. HAREKET (2.5x Speed)
+        -- 1. HIZ SİSTEMİ
         if hum and hum.MoveDirection.Magnitude > 0 then
             HRP.AssemblyLinearVelocity = Vector3.new(
                 hum.MoveDirection.X * 42,
@@ -61,28 +48,42 @@ RunService.Heartbeat:Connect(function()
             )
         end
 
-        -- 3. FLING GÜCÜ (Sarsıntısız)
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
-
-        -- 4. JJS STİLİ KİLİTLENME
+        -- 2. AKILLI GİZLİ SPIN (SADECE DİBİNDEYSE)
         if lockedTarget then
-            -- Karakteri rakibe döndür
-            local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
-            HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
+            local distance = (HRP.Position - lockedTarget.Position).Magnitude
             
-            -- Kamerayı yumuşakça rakibe odakla
+            if distance < 5 then -- DÜŞMANIN DİBİNE GİRİNCE (Hitbox Teması)
+                -- Fiziksel olarak aşırı hızlı dön (Uçurmak için)
+                HRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
+                
+                -- Ama görüntüyü CFrame ile anında kilitle (Gizlilik için)
+                local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
+                HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
+            else
+                -- Düşman uzaktaysa spini tamamen kapat
+                HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                
+                -- Sadece kilitlen ve ona bak
+                local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
+                HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
+            end
+            
+            -- Kamera Odağı
             local camLook = CFrame.lookAt(camera.CFrame.Position, lockedTarget.Position)
-            camera.CFrame = camera.CFrame:Lerp(camLook, 0.15) -- 0.15 kilitlenme hızı
+            camera.CFrame = camera.CFrame:Lerp(camLook, 0.12)
         else
-            -- Kimse yoksa normal bakış
+            -- Kimse yoksa spini kapat ve normal bak
+            HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             local camCF = camera.CFrame
             local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
             HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + flatLook)
         end
 
-        -- Görsel dönmeyi engelle (Client/Server)
+        -- Render kilit (Görsel pürüzsüzlük)
         RunService.RenderStepped:Wait()
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        if not lockedTarget or (HRP.Position - lockedTarget.Position).Magnitude >= 5 then
+            HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
     end
 end)
 
@@ -91,14 +92,13 @@ tool.Activated:Connect(function()
     if not canAttack or not player.Character or not lockedTarget then return end
     local HRP = player.Character.HumanoidRootPart
     
-    if (HRP.Position - lockedTarget.Position).Magnitude < 15 then
+    if (HRP.Position - lockedTarget.Position).Magnitude < 12 then
         canAttack = false
         lockedTarget.AssemblyLinearVelocity = Vector3.new(0,0,0)
         
-        -- Işınlanıp vurma
         local oldCF = HRP.CFrame
-        HRP.CFrame = lockedTarget.CFrame * CFrame.new(0, 0, 1)
-        HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 30000) + Vector3.new(0, 15000, 0)
+        HRP.CFrame = lockedTarget.CFrame * CFrame.new(0, 0, 1.2)
+        HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 28000) + Vector3.new(0, 12000, 0)
         
         task.wait(0.06)
         HRP.CFrame = oldCF
@@ -118,7 +118,6 @@ end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
-    lockHighlight.Parent = nil
     player.Character.Humanoid.AutoRotate = true
     for _, v in pairs(player.Character:GetChildren()) do
         if v:IsA("BasePart") then v.Massless = false end
