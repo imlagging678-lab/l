@@ -1,5 +1,5 @@
 -- ==========================================
--- DIVERGENT FIST (SERVER SPIN + CLIENT STABLE)
+-- DIVERGENT FIST (GHOST FLING - NO SPIN VISIBLE)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,32 +15,34 @@ tool.Parent = player:WaitForChild("Backpack")
 local isEquipped, canAttack = false, true
 local originalC0 = nil
 
--- [MOTOR: HIZ VE GÖRSEL SPIN]
+-- [GÖRÜNMEZ FLING MOTORU - SENİN MOTORUNUN YERİNE]
 RunService.Heartbeat:Connect(function()
-    if isEquipped and player.Character then
-        local HRP = player.Character:FindFirstChild("HumanoidRootPart")
+    if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
-        local rootJoint = HRP and (HRP:FindFirstChild("RootJoint") or (player.Character:FindFirstChild("LowerTorso") and player.Character.LowerTorso:FindFirstChild("RootJoint")))
+        local rootJoint = HRP:FindFirstChild("RootJoint") or (player.Character:FindFirstChild("LowerTorso") and player.Character.LowerTorso:FindFirstChild("RootJoint"))
         
-        if not HRP or not hum or not rootJoint then return end
-        
-        -- 1. HIZ ÇARPANI (Pürüzsüz WalkSpeed)
-        if hum.MoveDirection.Magnitude > 0 then
-            hum.WalkSpeed = 40
-        else
-            hum.WalkSpeed = 0
+        -- 1. HIZ ÇARPANI (2.5x Hissiyatı)
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            HRP.AssemblyLinearVelocity = Vector3.new(
+                hum.MoveDirection.X * 40,
+                HRP.AssemblyLinearVelocity.Y,
+                hum.MoveDirection.Z * 40
+            )
         end
         
-        -- 2. SERVER-VISIBLE SPIN (Kamerayı bozmayan yöntem)
-        -- Orijinal C0 değerini bir kez kaydediyoruz
-        if not originalC0 then originalC0 = rootJoint.C0 end
+        -- 2. GHOST FLING SİSTEMİ
+        -- Fiziksel olarak aşırı hızlı döndürüyoruz (Uçurması için)
+        HRP.AssemblyAngularVelocity = Vector3.new(0, 8000, 0)
         
-        -- RootJoint'i döndürerek karakterin görselini pervane yapıyoruz
-        -- Bu işlem HRP'yi (ve kamerayı) döndürmez ama server'da karakter modelin döner
-        rootJoint.C0 = rootJoint.C0 * CFrame.Angles(0, 0, math.rad(60))
-        
-        -- Fiziksel Fling Koruması
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        -- 3. GÖRSEL SABİTLEME (Görünmezlik)
+        -- Fiziksel dönüşün tam tersini yaparak karakteri düz tutuyoruz
+        if rootJoint then
+            if not originalC0 then originalC0 = rootJoint.C0 end
+            -- Dönüşü görsel olarak her karede sıfırlar
+            local relativeRotation = HRP.CFrame:ToObjectSpace(HRP.CFrame).Rotation
+            rootJoint.C0 = originalC0 * relativeRotation:Inverse()
+        end
     end
 end)
 
@@ -78,8 +80,7 @@ end)
 tool.Equipped:Connect(function() 
     isEquipped = true 
     if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 40
-        player.Character.Humanoid.AutoRotate = true -- Kameran özgürce döner
+        player.Character.Humanoid.WalkSpeed = 40 
     end
 end)
 
@@ -87,8 +88,7 @@ tool.Unequipped:Connect(function()
     isEquipped = false 
     if player.Character and player.Character:FindFirstChild("Humanoid") then
         player.Character.Humanoid.WalkSpeed = 16
-        
-        -- Resetleme: Karakteri düzelt
+        -- Görseli sıfırla
         local HRP = player.Character:FindFirstChild("HumanoidRootPart")
         local rootJoint = HRP and (HRP:FindFirstChild("RootJoint") or (player.Character:FindFirstChild("LowerTorso") and player.Character.LowerTorso:FindFirstChild("RootJoint")))
         if rootJoint and originalC0 then
