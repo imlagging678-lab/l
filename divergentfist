@@ -1,5 +1,5 @@
 -- ==========================================
--- DIVERGENT FIST (GHOST FLING - NO SPIN VISIBLE)
+-- DIVERGENT FIST (INVISIBLE PROXY FLING)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,36 +13,58 @@ tool.RequiresHandle = false
 tool.Parent = player:WaitForChild("Backpack")
 
 local isEquipped, canAttack = false, true
-local originalC0 = nil
+local proxyPart = nil
 
--- [GÖRÜNMEZ FLING MOTORU - SENİN MOTORUNUN YERİNE]
+-- [FLING PARÇASI OLUŞTURUCU]
+local function createProxy()
+    local p = Instance.new("Part")
+    p.Name = "FlingProxy"
+    p.Size = Vector3.new(5, 5, 5) -- Uçurma alanı boyutu
+    p.Transparency = 1 -- Görünmez
+    p.CanCollide = false
+    p.Massless = true
+    p.Parent = workspace
+    
+    -- Fiziksel dönüş gücü (Bu uçuran kısım)
+    local bv = Instance.new("AngularVelocity", p)
+    bv.MaxTorque = math.huge
+    bv.AngularVelocity = Vector3.new(0, 99999, 0)
+    bv.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+    
+    local att = Instance.new("Attachment", p)
+    bv.Attachment0 = att
+    
+    return p
+end
+
+-- [ANA MOTOR]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
-        local rootJoint = HRP:FindFirstChild("RootJoint") or (player.Character:FindFirstChild("LowerTorso") and player.Character.LowerTorso:FindFirstChild("RootJoint"))
         
-        -- 1. HIZ ÇARPANI (2.5x Hissiyatı)
+        -- 1. HIZ MOTORU (Kendi ekranında pürüzsüz)
         if hum and hum.MoveDirection.Magnitude > 0 then
             HRP.AssemblyLinearVelocity = Vector3.new(
-                hum.MoveDirection.X * 40,
+                hum.MoveDirection.X * 42,
                 HRP.AssemblyLinearVelocity.Y,
-                hum.MoveDirection.Z * 40
+                hum.MoveDirection.Z * 42
             )
         end
         
-        -- 2. GHOST FLING SİSTEMİ
-        -- Fiziksel olarak aşırı hızlı döndürüyoruz (Uçurması için)
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 8000, 0)
-        
-        -- 3. GÖRSEL SABİTLEME (Görünmezlik)
-        -- Fiziksel dönüşün tam tersini yaparak karakteri düz tutuyoruz
-        if rootJoint then
-            if not originalC0 then originalC0 = rootJoint.C0 end
-            -- Dönüşü görsel olarak her karede sıfırlar
-            local relativeRotation = HRP.CFrame:ToObjectSpace(HRP.CFrame).Rotation
-            rootJoint.C0 = originalC0 * relativeRotation:Inverse()
+        -- 2. PROXY FLING (Senin yerine o döner)
+        if not proxyPart or not proxyPart.Parent then
+            proxyPart = createProxy()
         end
+        
+        -- Görünmez parçayı senin pozisyonuna kitler ama rotasyonunu bozmaz
+        proxyPart.CFrame = HRP.CFrame
+        proxyPart.Velocity = HRP.Velocity
+        
+        -- Karakterinin kendi spinini tamamen kapatıyoruz (Sarsıntı sıfırlanır)
+        HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    else
+        if proxyPart then proxyPart:Destroy(); proxyPart = nil end
     end
 end)
 
@@ -56,7 +78,6 @@ tool.Activated:Connect(function()
         local enemyHRP = target.Parent.HumanoidRootPart
         if (HRP.Position - enemyHRP.Position).Magnitude < 10 then
             canAttack = false
-            
             enemyHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
             task.wait(0.12)
             
@@ -77,23 +98,8 @@ tool.Activated:Connect(function()
 end)
 
 -- [EQUIP/UNEQUIP]
-tool.Equipped:Connect(function() 
-    isEquipped = true 
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 40 
-    end
-end)
-
+tool.Equipped:Connect(function() isEquipped = true end)
 tool.Unequipped:Connect(function() 
     isEquipped = false 
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 16
-        -- Görseli sıfırla
-        local HRP = player.Character:FindFirstChild("HumanoidRootPart")
-        local rootJoint = HRP and (HRP:FindFirstChild("RootJoint") or (player.Character:FindFirstChild("LowerTorso") and player.Character.LowerTorso:FindFirstChild("RootJoint")))
-        if rootJoint and originalC0 then
-            rootJoint.C0 = originalC0
-            originalC0 = nil
-        end
-    end
+    if proxyPart then proxyPart:Destroy(); proxyPart = nil end
 end)
