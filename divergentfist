@@ -1,5 +1,5 @@
 -- ==========================================
--- DIVERGENT FIST (TZE NERF + 2.5x SPEED)
+-- DIVERGENT FIST (SMOOTH SYNC + 2.5x SPEED)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,28 +13,28 @@ tool.RequiresHandle = false
 tool.Parent = player:WaitForChild("Backpack")
 
 local isEquipped, canAttack = false, true
-local baseSpeed = 16 -- Roblox standart hızı
 
--- [HIZ VE SPIN MOTORU]
+-- [ANA MOTOR: HIZ VE GÖRSEL SPIN]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
         local hum = player.Character:FindFirstChild("Humanoid")
         
-        -- 1. HIZ ÇARPANI: Yürüme yönünde 2.5x hız desteği
+        -- 1. HIZ SİSTEMİ (FE Friendly)
+        -- AssemblyLinearVelocity yerine WalkSpeed kullanmak server senkronu için en iyisidir
         if hum and hum.MoveDirection.Magnitude > 0 then
-            -- Karakteri MoveDirection yönünde ekstra iterek 2.5x hız hissi verir
-            HRP.AssemblyLinearVelocity = Vector3.new(
-                hum.MoveDirection.X * 40, -- 16 * 2.5 = 40 stud/sn
-                HRP.AssemblyLinearVelocity.Y, -- Yerçekimini bozma
-                hum.MoveDirection.Z * 40
-            )
+            hum.WalkSpeed = 40 -- 16 * 2.5
+        else
+            hum.WalkSpeed = 0 -- Durunca kaymayı önlemek için
         end
         
-        -- 2. GÖRSEL SPIN (Takılma yapmayan düşük ayar)
-        HRP.AssemblyAngularVelocity = Vector3.new(0, 800, 0)
-        RunService.RenderStepped:Wait()
+        -- 2. GÖRSEL SPIN (Serverda Fling Görünmesini Engeller)
+        -- Fiziksel hızı (AngularVelocity) sıfırlıyoruz, sadece CFrame ile döndürüyoruz
         HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        
+        -- Dönüş açısı (Yürürken ve dururken pürüzsüzlük ayarı)
+        local spinRate = hum.MoveDirection.Magnitude > 0 and 45 or 60
+        HRP.CFrame = HRP.CFrame * CFrame.Angles(0, math.rad(spinRate), 0)
     end
 end)
 
@@ -49,12 +49,12 @@ tool.Activated:Connect(function()
         if (HRP.Position - enemyHRP.Position).Magnitude < 10 then
             canAttack = false
             
-            -- Divergent Fist Çift Darbe (Nerfli Ayar)
+            -- Divergent Fist Çift Darbe Etkisi
             enemyHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
             task.wait(0.12)
             
             local oldCF = HRP.CFrame
-            -- Shiftlock dengeli hafif itiş gücü
+            -- Shiftlock dengesi
             local power = (UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter) and 12000 or 22000
             
             HRP.CFrame = enemyHRP.CFrame * CFrame.new(0, 0, 0.4)
@@ -70,18 +70,21 @@ tool.Activated:Connect(function()
     end
 end)
 
--- [EQUIP/UNEQUIP HIZ KONTROLÜ]
+-- [EQUIP/UNEQUIP KONTROLÜ]
 tool.Equipped:Connect(function() 
     isEquipped = true 
     if player.Character and player.Character:FindFirstChild("Humanoid") then
-        -- Normal yürüme hızını da 2.5 katına (40) çıkarıyoruz
-        player.Character.Humanoid.WalkSpeed = 40 
+        local hum = player.Character.Humanoid
+        hum.WalkSpeed = 40 
+        hum.AutoRotate = false -- Kendi spin motorumuz için otomatik dönmeyi kapattık
     end
 end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
     if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 16 -- Eski hıza dön
+        local hum = player.Character.Humanoid
+        hum.WalkSpeed = 16 
+        hum.AutoRotate = true -- Normal yürüme moduna dön
     end
 end)
