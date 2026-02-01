@@ -1,5 +1,5 @@
 -- ==========================================
--- DIVERGENT FIST (ULTRA LIGHT GHOST FLING)
+-- DIVERGENT FIST (FIXED M1 + 0.5 SPIN)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -30,7 +30,7 @@ local function findTarget()
     return closest
 end
 
--- [ANA MOTOR: 0.2 GÜCÜNDE GİZLİ SPIN]
+-- [ANA MOTOR: 0.5 GÜCÜNDE GİZLİ SPIN]
 RunService.Heartbeat:Connect(function()
     if isEquipped and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local HRP = player.Character.HumanoidRootPart
@@ -47,22 +47,20 @@ RunService.Heartbeat:Connect(function()
             )
         end
 
-        -- 2. GİZLİ SPİN MANTIĞI (GÜÇ 0.2 SEVİYESİ)
+        -- 2. GİZLİ SPİN MANTIĞI (GÜÇ 0.5 SEVİYESİ)
         if lockedTarget then
             local distance = (HRP.Position - lockedTarget.Position).Magnitude
             
             -- HITBOX İÇİNDEYSE (Tam temas anı)
             if distance <= 5.5 then 
-                -- Güç 0.2 (200) olarak ayarlandı. Sarsıntı sıfıra yakındır.
-                HRP.AssemblyAngularVelocity = Vector3.new(0, 200, 0) 
+                -- Güç 0.5 (500 birim). Fırlatma için ideal, sarsıntı yapmaz.
+                HRP.AssemblyAngularVelocity = Vector3.new(0, 500, 0) 
                 
-                -- Görüntü Sabitleme (Anlık Kilitleme)
+                -- Görüntü Sabitleme
                 local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
                 HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
             else
-                -- UZAKTAYSA SIFIR
                 HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                
                 local targetPos = Vector3.new(lockedTarget.Position.X, HRP.Position.Y, lockedTarget.Position.Z)
                 HRP.CFrame = CFrame.lookAt(HRP.Position, targetPos)
             end
@@ -85,21 +83,29 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- [VURUŞ MANTIĞI]
+-- [VURUŞ MANTIĞI - UÇMA HATASI GİDERİLDİ]
 tool.Activated:Connect(function()
     if not canAttack or not player.Character or not lockedTarget then return end
     local HRP = player.Character.HumanoidRootPart
     
-    if (HRP.Position - lockedTarget.Position).Magnitude < 12 then
+    if (HRP.Position - lockedTarget.Position).Magnitude < 15 then
         canAttack = false
+        
+        -- Rakibi dondur
         lockedTarget.AssemblyLinearVelocity = Vector3.new(0,0,0)
         
         local oldCF = HRP.CFrame
+        -- Işınlan ve Vur
         HRP.CFrame = lockedTarget.CFrame * CFrame.new(0, 0, 1.2)
         HRP.AssemblyLinearVelocity = (HRP.CFrame.LookVector * 28000) + Vector3.new(0, 12000, 0)
         
         task.wait(0.06)
+        
+        -- [KRİTİK FİX]: Kendi hızımızı sıfırlıyoruz ki uçmayalım
         HRP.CFrame = oldCF
+        HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        
         task.wait(0.5)
         canAttack = true
     end
@@ -108,10 +114,14 @@ end)
 -- [EQUIP AYARLARI]
 tool.Equipped:Connect(function() 
     isEquipped = true 
-    player.Character.Humanoid.AutoRotate = false
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.AutoRotate = false
+    end
 end)
 
 tool.Unequipped:Connect(function() 
     isEquipped = false 
-    player.Character.Humanoid.AutoRotate = true
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.AutoRotate = true
+    end
 end)
